@@ -20,7 +20,7 @@ class Configuration(BaseModel):
         description="Number of research iterations to perform"
     )
     local_llm: str = Field(
-        default="llama3.2",
+        default="deepseek-r1:8b",
         title="LLM Model Name",
         description="Name of the LLM model to use"
     )
@@ -30,7 +30,7 @@ class Configuration(BaseModel):
         description="Provider for the LLM (Ollama or LMStudio)"
     )
     search_api: Literal["perplexity", "tavily", "duckduckgo", "searxng"] = Field(
-        default="duckduckgo",
+        default="tavily",
         title="Search API",
         description="Web search API to use"
     )
