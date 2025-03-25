@@ -1,6 +1,6 @@
-# Local Deep Researcher
+# Local Deep Writer
 
-Local Deep Researcher is a fully local web research assistant that uses any LLM hosted by [Ollama](https://ollama.com/search) or [LMStudio](https://lmstudio.ai/). Give it a topic and it will generate a web search query, gather web search results, summarize the results of web search, reflect on the summary to examine knowledge gaps, generate a new search query to address the gaps, and repeat for a user-defined number of cycles. It will provide the user a final markdown summary with all sources used to generate the summary.
+Local Deep Writer is a fully local article generation tool designed to create comprehensive, SEO-optimized, and well-structured articles on specific topics. Leveraging deep web research and powerful language models, it synthesizes information from various sources to produce lengthy, in-depth content complete with a detailed table of contents and organized sections. Whether you're writing a blog post, research article, or marketing content, Local Deep Writer ensures that every article stays strictly on-topic and is optimized for search engine performance.
 
 ![ollama-deep-research](https://github.com/user-attachments/assets/1c6b28f8-6b64-42ba-a491-1ab2875d50ea)
 

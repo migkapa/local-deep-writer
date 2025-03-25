@@ -296,46 +296,28 @@ def seo_analysis(state: SummaryState, config: RunnableConfig):
 def finalize_article(state: SummaryState):
     """LangGraph node that finalizes the SEO-optimized article.
     
-    Prepares the final output by deduplicating and formatting sources, then
-    combining them with the article content to create a well-structured,
-    SEO-optimized article with proper citations and attribution.
+    Prepares the final output with proper HTML formatting including headlines, paragraphs,
+    and table of contents with anchor links. Returns only the clean, formatted article
+    without any sources or additional metadata.
     
     Args:
-        state: Current graph state containing the article content, sources gathered, and SEO keywords
+        state: Current graph state containing the article content and SEO keywords
         
     Returns:
-        Dictionary with state update, including article_content and seo_keywords for the final article
+        Dictionary with state update, including article_content with HTML formatting and SEO keywords
     """
 
-    # Deduplicate sources before joining
-    seen_sources = set()
-    unique_sources = []
+    # The article content should already be properly formatted from the article_writer node
+    # with HTML anchors and structure from our instructions in the prompt
     
-    for source in state.sources_gathered:
-        # Split the source into lines and process each individually
-        for line in source.split('\n'):
-            # Only process non-empty lines
-            if line.strip() and line not in seen_sources:
-                seen_sources.add(line)
-                unique_sources.append(line)
-    
-    # Join the deduplicated sources
-    all_sources = "\n".join(unique_sources)
-    
-    # Format SEO keywords
-    seo_keywords_str = ", ".join(state.seo_keywords) if state.seo_keywords else "No specific keywords identified"
-    
-    # Prepare the final article with SEO information and sources
-    article_with_metadata = f"""# {state.research_topic}
+    # Format the article with the topic as title, but keep all the HTML formatting
+    # that was generated in the article_writer step
+    clean_article = f"""<h1>{state.research_topic}</h1>
 
-{state.article_content}
-
-## Sources
-{all_sources}
-
-<!-- SEO Keywords: {seo_keywords_str} -->"""
+{state.article_content}"""
     
-    return {"article_content": article_with_metadata, "seo_keywords": state.seo_keywords}
+    # Return just the clean article with HTML formatting and SEO keywords
+    return {"article_content": clean_article, "seo_keywords": state.seo_keywords}
 
 def route_research(state: SummaryState, config: RunnableConfig) -> Literal["finalize_article", "web_research"]:
     """LangGraph routing function that determines the next step in the content creation flow.
