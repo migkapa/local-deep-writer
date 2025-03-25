@@ -16,8 +16,6 @@ This project is inspired by and modified from [langchain-ai/local-deep-researche
 
 ## 🚀 Quickstart
 
-## 🚀 Quickstart
-
 1. Clone the repository:
 ```shell
 git clone https://github.com/migkapa/local-deep-writer.git

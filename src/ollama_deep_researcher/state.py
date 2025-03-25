@@ -2,7 +2,7 @@ import operator
 from dataclasses import dataclass, field
 from typing_extensions import Annotated
 
-@dataclass(kw_only=True)
+@dataclass
 class SummaryState:
     research_topic: str = field(default=None) # Article topic     
     search_query: str = field(default=None) # Search query
@@ -13,11 +13,11 @@ class SummaryState:
     html_content: str = field(default=None) # The HTML version of the article content
     seo_keywords: Annotated[list, operator.add] = field(default_factory=list) # SEO keywords identified
 
-@dataclass(kw_only=True)
+@dataclass
 class SummaryStateInput:
     research_topic: str = field(default=None) # Article topic     
 
-@dataclass(kw_only=True)
+@dataclass
 class SummaryStateOutput:
     article_content: str = field(default=None) # Final article in markdown
     html_content: str = field(default=None) # Final article in HTML
