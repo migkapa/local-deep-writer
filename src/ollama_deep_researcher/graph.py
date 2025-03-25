@@ -111,38 +111,64 @@ def web_research(state: SummaryState, config: RunnableConfig):
 
     return {"sources_gathered": [format_sources(search_results)], "research_loop_count": state.research_loop_count + 1, "web_research_results": [search_str]}
 
-def summarize_sources(state: SummaryState, config: RunnableConfig):
-    """LangGraph node that summarizes web research results.
+def article_writer(state: SummaryState, config: RunnableConfig):
+    """LangGraph node that creates or enhances an SEO-optimized article.
     
-    Uses an LLM to create or update a running summary based on the newest web research 
-    results, integrating them with any existing summary.
+    Uses an LLM to create or update an article based on the newest web research 
+    results, integrating them with any existing content and optimizing for SEO.
     
     Args:
-        state: Current graph state containing research topic, running summary,
-              and web research results
+        state: Current graph state containing research topic, article content,
+              web research results, and SEO keywords
         config: Configuration for the runnable, including LLM provider settings
         
     Returns:
-        Dictionary with state update, including running_summary key containing the updated summary
+        Dictionary with state update, including article_content and seo_keywords
     """
 
-    # Existing summary
-    existing_summary = state.running_summary
+    # Existing article content
+    existing_article = state.article_content
 
     # Most recent web research
     most_recent_web_research = state.web_research_results[-1]
+    
+    # Get SEO keywords - either from state or from generate_query result
+    seo_keywords = state.seo_keywords if state.seo_keywords else []
+    
+    # Format SEO keywords for the prompt
+    seo_keywords_str = ", ".join(seo_keywords) if seo_keywords else "No specific keywords identified yet"
 
     # Build the human message
-    if existing_summary:
+    if existing_article:
         human_message_content = (
-            f"<User Input> \n {state.research_topic} \n <User Input>\n\n"
-            f"<Existing Summary> \n {existing_summary} \n <Existing Summary>\n\n"
-            f"<New Search Results> \n {most_recent_web_research} \n <New Search Results>"
+            f"WRITE STRICTLY ABOUT THIS TOPIC: '{state.research_topic}'\n\n"
+            f"<Article Topic> \n {state.research_topic} \n </Article Topic>\n\n"
+            f"<SEO Keywords> \n {seo_keywords_str} \n </SEO Keywords>\n\n"
+            f"<Existing Article> \n {existing_article} \n </Existing Article>\n\n"
+            f"<New Research> \n {most_recent_web_research} \n </New Research>\n\n"
+            f"ARTICLE STRUCTURE REQUIREMENTS:\n"
+            f"1. Begin with a 'In This Article' table of contents with anchor links to each section\n"
+            f"2. Write a substantial, in-depth article (1500-2000+ words)\n"
+            f"3. Organize into 5-7 well-structured sections with descriptive headers\n"
+            f"4. Each section should have at least 3-4 paragraphs of detailed content\n"
+            f"5. Use proper HTML anchors for all section headers (<h2 id=\"section-id\">Section Title</h2>)\n"
+            f"6. Include comparison tables, lists, and examples where relevant\n\n"
+            f"IMPORTANT: Your entire article must focus ONLY on '{state.research_topic}' using ONLY the provided research materials."
         )
     else:
         human_message_content = (
-            f"<User Input> \n {state.research_topic} \n <User Input>\n\n"
-            f"<Search Results> \n {most_recent_web_research} \n <Search Results>"
+            f"WRITE STRICTLY ABOUT THIS TOPIC: '{state.research_topic}'\n\n"
+            f"<Article Topic> \n {state.research_topic} \n </Article Topic>\n\n"
+            f"<SEO Keywords> \n {seo_keywords_str} \n </SEO Keywords>\n\n"
+            f"<Research Materials> \n {most_recent_web_research} \n </Research Materials>\n\n"
+            f"ARTICLE STRUCTURE REQUIREMENTS:\n"
+            f"1. Begin with a 'In This Article' table of contents with anchor links to each section\n"
+            f"2. Write a substantial, in-depth article (1500-2000+ words)\n"
+            f"3. Organize into 5-7 well-structured sections with descriptive headers\n"
+            f"4. Each section should have at least 3-4 paragraphs of detailed content\n"
+            f"5. Use proper HTML anchors for all section headers (<h2 id=\"section-id\">Section Title</h2>)\n"
+            f"6. Include comparison tables, lists, and examples where relevant\n\n"
+            f"IMPORTANT: Your entire article must focus ONLY on '{state.research_topic}' using ONLY the provided research materials."
         )
 
     # Run the LLM
@@ -168,28 +194,36 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
     )
 
     # Strip thinking tokens if configured
-    running_summary = result.content
+    article_content = result.content
     if configurable.strip_thinking_tokens:
-        running_summary = strip_thinking_tokens(running_summary)
+        article_content = strip_thinking_tokens(article_content)
 
-    return {"running_summary": running_summary}
+    return {"article_content": article_content}
 
-def reflect_on_summary(state: SummaryState, config: RunnableConfig):
-    """LangGraph node that identifies knowledge gaps and generates follow-up queries.
+def seo_analysis(state: SummaryState, config: RunnableConfig):
+    """LangGraph node that analyzes article content for SEO optimization opportunities.
     
-    Analyzes the current summary to identify areas for further research and generates
-    a new search query to address those gaps. Uses structured output to extract
-    the follow-up query in JSON format.
+    Analyzes the current article to identify content gaps, SEO opportunities, and generates
+    follow-up queries to enhance article quality and search ranking. Uses structured output 
+    to extract SEO recommendations and follow-up queries in JSON format.
     
     Args:
-        state: Current graph state containing the running summary and research topic
+        state: Current graph state containing the article content and research topic
         config: Configuration for the runnable, including LLM provider settings
         
     Returns:
-        Dictionary with state update, including search_query key containing the generated follow-up query
+        Dictionary with state update, including search_query and seo_keywords
     """
 
-    # Generate a query
+    # Get previous queries to avoid repetition
+    previous_queries = []
+    if hasattr(state, 'search_query') and state.search_query:
+        previous_queries.append(state.search_query)
+    
+    # Format previous queries
+    prev_queries_str = ", ".join(previous_queries) if previous_queries else "No previous queries"
+
+    # Generate SEO analysis
     configurable = Configuration.from_runnable_config(config)
     
     # Choose the appropriate LLM based on the provider
@@ -209,37 +243,68 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
         )
     
     result = llm_json_mode.invoke(
-        [SystemMessage(content=reflection_instructions.format(research_topic=state.research_topic)),
-        HumanMessage(content=f"Reflect on our existing knowledge: \n === \n {state.running_summary}, \n === \n And now identify a knowledge gap and generate a follow-up web search query:")]
+        [SystemMessage(content=reflection_instructions.format(
+            research_topic=state.research_topic,
+            previous_queries=prev_queries_str,
+            current_summary=state.article_content or "No article content yet."
+        )),
+        HumanMessage(content=f"Analyze this article for SEO optimization and content improvement opportunities:")]
     )
     
-    # Strip thinking tokens if configured
+    # Process the result
     try:
         # Try to parse as JSON first
-        reflection_content = json.loads(result.content)
+        seo_analysis = json.loads(result.content)
+        
         # Get the follow-up query
-        query = reflection_content.get('follow_up_query')
+        query = seo_analysis.get('follow_up_query')
+        
+        # Get SEO keywords and ensure they're unique
+        new_keywords = seo_analysis.get('target_keywords', [])
+        
+        # Extract section gaps and content opportunities if available
+        section_gaps = seo_analysis.get('section_gaps', [])
+        content_opportunities = seo_analysis.get('content_opportunities', [])
+        
+        # For logging/debugging - print what we found
+        print(f"Found {len(new_keywords)} keywords, {len(section_gaps)} section gaps, and {len(content_opportunities)} content opportunities")
+        
         # Check if query is None or empty
         if not query:
             # Use a fallback query
-            return {"search_query": f"Tell me more about {state.research_topic}"}
-        return {"search_query": query}
+            query = f"Tell me more about {state.research_topic}"
+            
+        # Add the new keywords to the state - properly deduplicate
+        existing_keywords = state.seo_keywords if state.seo_keywords else []
+        
+        # Normalize and deduplicate keywords (case-insensitive)
+        normalized_existing = [k.lower().strip() for k in existing_keywords]
+        all_keywords = existing_keywords.copy()
+        
+        for keyword in new_keywords:
+            # Only add if normalized version isn't already in list
+            normalized = keyword.lower().strip()
+            if normalized not in normalized_existing:
+                all_keywords.append(keyword)
+                normalized_existing.append(normalized)
+            
+        return {"search_query": query, "seo_keywords": all_keywords}
     except (json.JSONDecodeError, KeyError, AttributeError):
         # If parsing fails or the key is not found, use a fallback query
         return {"search_query": f"Tell me more about {state.research_topic}"}
         
-def finalize_summary(state: SummaryState):
-    """LangGraph node that finalizes the research summary.
+def finalize_article(state: SummaryState):
+    """LangGraph node that finalizes the SEO-optimized article.
     
     Prepares the final output by deduplicating and formatting sources, then
-    combining them with the running summary to create a well-structured
-    research report with proper citations.
+    combining them with the article content to create a well-structured,
+    SEO-optimized article with proper citations and attribution.
     
     Args:
-        state: Current graph state containing the running summary and sources gathered
+        state: Current graph state containing the article content, sources gathered, and SEO keywords
         
     Returns:
-        Dictionary with state update, including running_summary key containing the formatted final summary with sources
+        Dictionary with state update, including article_content and seo_keywords for the final article
     """
 
     # Deduplicate sources before joining
@@ -256,43 +321,56 @@ def finalize_summary(state: SummaryState):
     
     # Join the deduplicated sources
     all_sources = "\n".join(unique_sources)
-    state.running_summary = f"## Summary\n\n{state.running_summary}\n\n ### Sources:\n{all_sources}"
-    return {"running_summary": state.running_summary}
+    
+    # Format SEO keywords
+    seo_keywords_str = ", ".join(state.seo_keywords) if state.seo_keywords else "No specific keywords identified"
+    
+    # Prepare the final article with SEO information and sources
+    article_with_metadata = f"""# {state.research_topic}
 
-def route_research(state: SummaryState, config: RunnableConfig) -> Literal["finalize_summary", "web_research"]:
-    """LangGraph routing function that determines the next step in the research flow.
+{state.article_content}
+
+## Sources
+{all_sources}
+
+<!-- SEO Keywords: {seo_keywords_str} -->"""
+    
+    return {"article_content": article_with_metadata, "seo_keywords": state.seo_keywords}
+
+def route_research(state: SummaryState, config: RunnableConfig) -> Literal["finalize_article", "web_research"]:
+    """LangGraph routing function that determines the next step in the content creation flow.
     
     Controls the research loop by deciding whether to continue gathering information
-    or to finalize the summary based on the configured maximum number of research loops.
+    or to finalize the article based on the configured maximum number of research loops.
     
     Args:
         state: Current graph state containing the research loop count
         config: Configuration for the runnable, including max_web_research_loops setting
         
     Returns:
-        String literal indicating the next node to visit ("web_research" or "finalize_summary")
+        String literal indicating the next node to visit ("web_research" or "finalize_article")
     """
 
     configurable = Configuration.from_runnable_config(config)
     if state.research_loop_count <= configurable.max_web_research_loops:
         return "web_research"
     else:
-        return "finalize_summary"
+        return "finalize_article"
 
 # Add nodes and edges
 builder = StateGraph(SummaryState, input=SummaryStateInput, output=SummaryStateOutput, config_schema=Configuration)
 builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
-builder.add_node("summarize_sources", summarize_sources)
-builder.add_node("reflect_on_summary", reflect_on_summary)
-builder.add_node("finalize_summary", finalize_summary)
+builder.add_node("article_writer", article_writer)
+builder.add_node("seo_analysis", seo_analysis)
+builder.add_node("finalize_article", finalize_article)
 
 # Add edges
 builder.add_edge(START, "generate_query")
 builder.add_edge("generate_query", "web_research")
-builder.add_edge("web_research", "summarize_sources")
-builder.add_edge("summarize_sources", "reflect_on_summary")
-builder.add_conditional_edges("reflect_on_summary", route_research)
-builder.add_edge("finalize_summary", END)
+builder.add_edge("web_research", "article_writer")
+builder.add_edge("article_writer", "seo_analysis")
+builder.add_conditional_edges("seo_analysis", route_research)
+builder.add_edge("finalize_article", END)
 
 graph = builder.compile()

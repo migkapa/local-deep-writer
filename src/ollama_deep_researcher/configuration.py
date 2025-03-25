@@ -20,12 +20,12 @@ class Configuration(BaseModel):
         description="Number of research iterations to perform"
     )
     local_llm: str = Field(
-        default="deepseek-r1:8b",
+        default="deepseek-r1-distill-llama-8b",
         title="LLM Model Name",
         description="Name of the LLM model to use"
     )
     llm_provider: Literal["ollama", "lmstudio"] = Field(
-        default="ollama",
+        default="lmstudio",
         title="LLM Provider",
         description="Provider for the LLM (Ollama or LMStudio)"
     )
@@ -45,7 +45,7 @@ class Configuration(BaseModel):
         description="Base URL for Ollama API"
     )
     lmstudio_base_url: str = Field(
-        default="http://localhost:1234/v1",
+        default="http://127.0.0.1:1234/v1",
         title="LMStudio Base URL",
         description="Base URL for LMStudio OpenAI-compatible API"
     )

@@ -2,6 +2,8 @@
 
 import json
 import logging
+import sys
+import traceback
 from typing import Any, List, Optional
 
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
@@ -12,7 +14,9 @@ from langchain_core.outputs import ChatResult
 from langchain_openai import ChatOpenAI
 from pydantic import Field
 
-# Set up logging
+# Set up logging with more detailed format
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class ChatLMStudio(ChatOpenAI):
@@ -29,6 +33,8 @@ class ChatLMStudio(ChatOpenAI):
         api_key: str = "not-needed-for-local-models",
         **kwargs: Any,
     ):
+        # Log initialization parameters
+        logger.info(f"Initializing ChatLMStudio with base_url={base_url}, model={model}")
         """Initialize the ChatLMStudio.
         
         Args:
@@ -39,15 +45,21 @@ class ChatLMStudio(ChatOpenAI):
             api_key: API key (not actually used, but required by OpenAI client)
             **kwargs: Additional arguments to pass to the OpenAI client
         """
-        # Initialize the base class
-        super().__init__(
-            base_url=base_url,
-            model=model,
-            temperature=temperature,
-            api_key=api_key,
-            **kwargs,
-        )
-        self.format = format
+        try:
+            # Initialize the base class
+            super().__init__(
+                base_url=base_url,
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+                **kwargs,
+            )
+            self.format = format
+            logger.info("ChatLMStudio initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing ChatLMStudio: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
         
     def _generate(
         self,
@@ -56,16 +68,24 @@ class ChatLMStudio(ChatOpenAI):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
+        logger.info(f"Generating response with ChatLMStudio using {len(messages)} messages")
         
         """Generate a chat response using LMStudio's OpenAI-compatible API."""
         
-        if self.format == "json":
-            # Set response_format for JSON mode
-            kwargs["response_format"] = {"type": "json_object"}
-            logger.info(f"Using response_format={kwargs['response_format']}")
-        
-        # Call the parent class's _generate method
-        result = super()._generate(messages, stop, run_manager, **kwargs)
+        try:
+            if self.format == "json":
+                # Set response_format for JSON mode
+                kwargs["response_format"] = {"type": "json_object"}
+                logger.info(f"Using response_format={kwargs['response_format']}")
+            
+            logger.info(f"Calling OpenAI API at {self.base_url} with model {self.model_name}")
+            # Call the parent class's _generate method
+            result = super()._generate(messages, stop, run_manager, **kwargs)
+            logger.info("Successfully generated response from LMStudio")
+        except Exception as e:
+            logger.error(f"Error generating response with ChatLMStudio: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
         
         # If JSON format is requested, try to clean up the response
         if self.format == "json" and result.generations:

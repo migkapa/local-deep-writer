@@ -2,3 +2,7 @@
 .env.example
 .venv
 __pycache__
+ollama_deep_researcher.egg-info
+# Ignore all .pckl files
+*.pckl
+.langgraph_api
